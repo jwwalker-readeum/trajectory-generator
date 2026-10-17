@@ -320,6 +320,113 @@ sweep:
   burn_param_step: 0.05
 ```
 
+## Railway Deployment (Phase 3)
+
+This repository is configured for easy deployment to [Railway](https://railway.app) using Docker. **This PR prepares the deployment configuration but does NOT deploy any live service.**
+
+### Prerequisites
+
+- A Railway account (free tier available at [railway.app](https://railway.app))
+- GitHub repository access
+- Basic understanding of Railway's pricing model
+
+### Deployment Steps
+
+1. **Connect Repository to Railway**
+   - Log in to Railway dashboard
+   - Click **"New Project"** → **"Deploy from GitHub repo"**
+   - Select this repository from the list
+   - Railway will automatically detect the `Dockerfile` and `railway.json`
+
+2. **Configure Environment Variables**
+   - In the Railway project dashboard, go to **Variables** tab
+   - Add required/optional variables:
+
+   **Optional (recommended for Phase 2+ UI):**
+   - `APP_PASSWORD` - Password to gate web UI access in production (leave unset for API-only or local dev)
+   
+   **Optional (for CesiumJS 3D visualization in Phase 2+):**
+   - `CESIUM_ION_TOKEN` - Free token from [cesium.com/ion/tokens](https://cesium.com/ion/tokens)
+   
+   **Optional (to override default config):**
+   - `VEHICLE_CONFIG_PATH` - Path to vehicle config (defaults to `/app/vehicle_config.yaml`)
+   
+   **Automatic:**
+   - `PORT` - Railway automatically provides this, do not set manually
+
+3. **Deploy**
+   - Railway automatically builds and deploys on push to `main` branch
+   - Initial build takes ~2-3 minutes
+   - Monitor deployment in the **Deployments** tab
+
+4. **Generate Domain**
+   - Go to **Settings** → **Networking**
+   - Click **"Generate Domain"** for a public `*.up.railway.app` URL
+   - Or add a custom domain if desired
+
+5. **Verify Deployment**
+   - Visit `https://your-app.up.railway.app/api/health`
+   - Should return `{"status": "healthy", "message": "WARNING: NOTIONAL DEMO SERVICE..."}`
+   - API documentation available at `/docs`
+
+### Cost Estimation
+
+**Railway Pricing Model** (as of October 2024):
+- **Free Trial**: $5 USD credit (one-time)
+- **Hobby Plan**: $5/month for 500 hours ($0.01/hour)
+- **Pro Plan**: Pay-as-you-go, ~$10-20/month for a small web service
+
+**Expected Usage**:
+- This service is a **lightweight Python web API** with minimal compute
+- Typical usage: **Small web service class** (~512 MB RAM, minimal CPU)
+- Estimated cost: **$5-10/month on Hobby plan** for moderate traffic
+- Free tier credits cover initial testing and low-volume use
+
+**Cost Optimization**:
+- Service sleeps automatically when idle on Railway
+- No database or heavy compute requirements
+- Sweep cache stored in-memory (ephemeral storage)
+
+### Railway Configuration Files
+
+This repository includes:
+
+- **`Dockerfile`**: Production-ready container with:
+  - Binds to `0.0.0.0` (required for Railway)
+  - Honors `$PORT` environment variable from Railway
+  - Health check endpoint (`/api/health`)
+  - Copies `vehicle_config.yaml` and `static/` files (when present)
+
+- **`railway.json`**: Railway deployment configuration:
+  - Uses Dockerfile builder (not Nixpacks)
+  - Single replica with auto-restart on failure
+  - Health check monitoring
+
+- **`.env.example`**: Environment variable template for reference
+
+### Deployment Notes
+
+- **This PR does NOT deploy a live service** - it only prepares the configuration
+- Railway auto-deploys from `main` branch after initial setup
+- All simulation results remain **NOTIONAL DEMO VALUES** in production
+- For local development, continue using `uvicorn` directly (see Installation section)
+
+### Troubleshooting
+
+**Build Failures:**
+- Check Railway build logs in the **Deployments** tab
+- Verify `requirements.txt` dependencies are compatible with Python 3.11
+
+**Service Won't Start:**
+- Verify health check passes: `/api/health` should return 200 OK
+- Check Railway service logs for startup errors
+- Ensure `VEHICLE_CONFIG_PATH` is not set incorrectly
+
+**Performance Issues:**
+- Initial sweep build takes ~10-30 seconds on startup (cached afterward)
+- Consider upgrading Railway plan if hitting memory/CPU limits
+- Monitor resource usage in Railway metrics dashboard
+
 ## Model Assumptions and Limitations
 
 ### Simplifications
@@ -406,7 +513,9 @@ Test coverage includes:
 .
 ├── vehicle_config.yaml       # Vehicle configuration
 ├── requirements.txt          # Python dependencies
-├── Dockerfile               # Container definition
+├── Dockerfile               # Production container (Phase 2+3)
+├── railway.json             # Railway deployment config (Phase 3)
+├── .env.example             # Environment variable template
 ├── src/
 │   └── trajgen/
 │       ├── __init__.py
@@ -437,15 +546,21 @@ Test coverage includes:
 
 ```
 
-### Phase 3 (Future)
+### Future Phases
 
-**Railway Deployment** (not yet implemented):
-- One-click Railway deployment
-- Environment variable configuration through Railway dashboard
-- Production-ready logging and monitoring
-- Health check endpoints for Railway
+**Phase 3** (this PR - deployment prep):
+- Railway deployment configuration ✅
+- Production-ready containerization ✅
+- Environment variable documentation ✅
+- Deployment guide ✅
+- **Note**: No live service deployed - configuration only
 
-The codebase and Dockerfile are ready for Railway deployment.
+**Phase 4** (future):
+- Actual Railway deployment (by maintainer)
+- Production monitoring and logging
+- Enhanced error handling and resilience
+
+The codebase is structured to support these additions with minimal refactoring.
 
 ## License
 
