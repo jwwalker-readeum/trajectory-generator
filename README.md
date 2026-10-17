@@ -15,7 +15,9 @@ This service provides a REST API for checking the feasibility of ballistic traje
 - Prototyping web-based mission planning interfaces
 - Educational examples of flight dynamics
 
-## Features (Phase 1)
+## Features
+
+### Phase 1 (API Backend)
 
 - **Vehicle Configuration**: YAML-based vehicle parameters with validation
 - **3-DOF Simulation**: Point-mass trajectory with:
@@ -28,6 +30,19 @@ This service provides a REST API for checking the feasibility of ballistic traje
 - **Reachability Sweep**: Offline parameter sweep to build feasibility envelope
 - **Feasibility API**: REST endpoints to check if launch-landing pairs are achievable
 - **Trajectory API**: Compute full time-series trajectory data
+
+### Phase 2 (Web UI)
+
+- **Password Gate**: Simple authentication for single-user demo deployment
+- **Interactive Map**: Leaflet + OpenStreetMap for selecting launch and landing points
+- **Real-time Feasibility**: Click-to-check if mission is within vehicle envelope
+- **Trajectory Visualization**: 
+  - Altitude vs Range charts
+  - Altitude vs Mach charts
+  - Real-time constraint checking (g-load, heating)
+- **3D Flyout**: CesiumJS 3D globe visualization of trajectory path
+- **Advanced Settings**: In-UI editor for vehicle configuration with live validation
+- **Mobile-Responsive**: Works on tablets and mobile devices
 
 ## Installation
 
@@ -49,7 +64,19 @@ cd <repo-directory>
 pip install -r requirements.txt
 ```
 
-3. Run the service:
+3. Set environment variables (optional):
+```bash
+# Enable password authentication (recommended for deployment)
+export APP_PASSWORD="your_secure_password"
+
+# Optional: Cesium Ion token for enhanced 3D imagery
+export CESIUM_ION_TOKEN="your_cesium_token"
+
+# Optional: Custom vehicle config path
+export VEHICLE_CONFIG_PATH="/path/to/config.yaml"
+```
+
+4. Run the service:
 ```bash
 # Option 1: Direct execution
 python -m src.trajgen.main
@@ -62,11 +89,29 @@ uvicorn trajgen.main:app --reload --host 0.0.0.0 --port 8000
 The service will:
 - Load `vehicle_config.yaml`
 - Build reachability sweep (cached to `.cache/sweep_cache.json`)
-- Start API server on `http://localhost:8000`
+- Start web server on `http://localhost:8000`
+
+### Accessing the UI
+
+1. Open your browser to `http://localhost:8000`
+2. If `APP_PASSWORD` is set, enter the password at the login screen
+3. Use the interactive map to select launch and landing points
+4. Check feasibility or compute full trajectory with visualization
+
+## Authentication
+
+The service supports simple password authentication for single-user demo deployment:
+
+- **Password Gate**: Set `APP_PASSWORD` environment variable to require login
+- **Session Management**: Uses HTTP cookies (24-hour expiry)
+- **Public Endpoints**: Health check and login page remain accessible
+- **Development**: Leave `APP_PASSWORD` unset to disable authentication
+
+**Note**: This is a simple demo authentication system. For production use, implement proper user management, HTTPS, and secure session storage.
 
 ## API Documentation
 
-Once running, visit `http://localhost:8000/docs` for interactive API documentation (Swagger UI).
+The REST API is still available for programmatic access. Visit `http://localhost:8000/docs` for interactive API documentation (Swagger UI).
 
 ### Endpoints
 
@@ -202,6 +247,16 @@ Compute full trajectory for a launch-landing pair (if feasible).
 
 ## Configuration
 
+### Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `APP_PASSWORD` | No | None | Password for UI access. If not set, authentication is disabled |
+| `CESIUM_ION_TOKEN` | No | Default | Cesium Ion access token for enhanced 3D imagery |
+| `VEHICLE_CONFIG_PATH` | No | `./vehicle_config.yaml` | Path to vehicle configuration file |
+
+### Vehicle Configuration
+
 The vehicle configuration is stored in `vehicle_config.yaml` at the repository root. The configuration path can be overridden with the `VEHICLE_CONFIG_PATH` environment variable.
 
 ### Notional Parameter Tuning
@@ -318,6 +373,31 @@ Test coverage includes:
 - Feasibility outcomes (reachable, too close, too far, g-limit, heat-limit)
 - API endpoints with TestClient
 
+## Using the Web Interface
+
+### Mission Planning Workflow
+
+1. **Set Launch Point**: Click on the map to place a launch marker (🚀)
+2. **Set Landing Point**: Click again to place a landing marker (🎯)
+3. **Check Feasibility**: Click "Check Feasibility" to see if the mission is achievable
+   - View range, azimuth, and envelope distance
+   - See constraint violations (if any)
+4. **Compute Trajectory**: Click "Compute Trajectory" for full simulation
+   - View altitude vs range chart
+   - View altitude vs Mach chart
+   - See peak g-load and heating values
+5. **3D Visualization**: Click "View 3D" to see trajectory on Cesium globe
+6. **Adjust Vehicle**: Click "⚙️ Settings" to modify vehicle parameters
+   - Edit configuration JSON
+   - System automatically rebuilds sweep on save
+
+### Tips
+
+- **Clear Markers**: Use the "Clear Markers" button to reset
+- **Mobile**: The UI is touch-friendly for tablet/mobile use
+- **Range**: Default vehicle targets ~400-3000 km demonstration ranges
+- **Constraints**: Watch for g-load and heating limit violations in red
+
 ## Development
 
 ### Project Structure
@@ -326,7 +406,7 @@ Test coverage includes:
 .
 ├── vehicle_config.yaml       # Vehicle configuration
 ├── requirements.txt          # Python dependencies
-├── Dockerfile               # Container definition (for Phase 3)
+├── Dockerfile               # Container definition
 ├── src/
 │   └── trajgen/
 │       ├── __init__.py
@@ -335,36 +415,37 @@ Test coverage includes:
 │       ├── simulation.py    # 3-DOF trajectory simulation
 │       ├── sweep.py         # Reachability sweep
 │       ├── feasibility.py   # Feasibility checking
-│       ├── api.py          # FastAPI endpoints
+│       ├── api.py          # FastAPI endpoints + UI serving
+│       ├── auth.py         # Password authentication middleware
 │       └── main.py         # Application entrypoint
+├── static/
+│   ├── index.html          # Main UI
+│   ├── login.html          # Login page
+│   ├── style.css           # Styling
+│   └── app.js              # Client-side application logic
 ├── tests/
 │   ├── test_config.py
 │   ├── test_atmosphere.py
 │   ├── test_simulation.py
 │   ├── test_sweep.py
 │   ├── test_feasibility.py
-│   └── test_api.py
+│   ├── test_api.py
+│   └── test_auth.py        # Authentication tests
 └── .github/
     └── workflows/
         └── ci.yml          # GitHub Actions CI
 
 ```
 
-### Future Phases
+### Phase 3 (Future)
 
-**Phase 2** (not yet implemented):
-- Web UI with Leaflet/OSM map for point selection
-- Charts for trajectory visualization
-- CesiumJS 3D trajectory overlay
-- Password authentication
-- Advanced settings editor
+**Railway Deployment** (not yet implemented):
+- One-click Railway deployment
+- Environment variable configuration through Railway dashboard
+- Production-ready logging and monitoring
+- Health check endpoints for Railway
 
-**Phase 3** (not yet implemented):
-- Railway deployment configuration
-- Production-ready containerization
-- Static file serving for UI
-
-The codebase is structured to support these additions with minimal refactoring.
+The codebase and Dockerfile are ready for Railway deployment.
 
 ## License
 

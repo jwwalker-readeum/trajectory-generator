@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Trajectory Generator</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- CesiumJS CSS -->
+    <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Widgets/widgets.css" />
+    
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🚀 Demo Trajectory Generator</h1>
+                <div class="header-actions">
+                    <button id="settingsBtn" class="btn btn-secondary">⚙️ Settings</button>
+                    <button id="aboutBtn" class="btn btn-secondary">ℹ️ About</button>
+                </div>
+            </div>
+            <div class="warning-banner">
+                ⚠️ <strong>NOTIONAL DEMO:</strong> All vehicle parameters and simulation results are for demonstration only
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel: Map -->
+            <div class="panel map-panel">
+                <div class="panel-header">
+                    <h2>Mission Planning</h2>
+                    <button id="clearBtn" class="btn btn-small">Clear Markers</button>
+                </div>
+                <div id="map" class="map-container"></div>
+                <div class="map-info">
+                    <div class="info-row">
+                        <span class="info-label">Launch:</span>
+                        <span id="launchInfo" class="info-value">Click map to set</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Landing:</span>
+                        <span id="landingInfo" class="info-value">Not set</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Range:</span>
+                        <span id="rangeInfo" class="info-value">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Feasibility:</span>
+                        <span id="feasibilityInfo" class="info-value status-unknown">Unknown</span>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button id="checkFeasibilityBtn" class="btn btn-primary" disabled>Check Feasibility</button>
+                    <button id="computeTrajectoryBtn" class="btn btn-success" disabled>Compute Trajectory</button>
+                </div>
+            </div>
+            
+            <!-- Right Panel: Results -->
+            <div class="panel results-panel">
+                <div class="panel-header">
+                    <h2>Results</h2>
+                    <button id="show3DBtn" class="btn btn-small" style="display: none;">View 3D</button>
+                </div>
+                
+                <div id="emptyState" class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <p>Set launch and landing points to begin</p>
+                </div>
+                
+                <div id="resultsContent" class="results-content" style="display: none;">
+                    <!-- Constraints Summary -->
+                    <div class="constraints-summary">
+                        <h3>Constraints</h3>
+                        <div class="constraint-grid">
+                            <div class="constraint-item">
+                                <span class="constraint-label">Peak G-Load:</span>
+                                <span id="gLoadValue" class="constraint-value">-</span>
+                            </div>
+                            <div class="constraint-item">
+                                <span class="constraint-label">Peak Heating:</span>
+                                <span id="heatFluxValue" class="constraint-value">-</span>
+                            </div>
+                            <div class="constraint-item">
+                                <span class="constraint-label">Distance to Envelope:</span>
+                                <span id="envelopeDistance" class="constraint-value">-</span>
+                            </div>
+                        </div>
+                        <div id="reasonsList" class="reasons-list"></div>
+                    </div>
+                    
+                    <!-- Charts -->
+                    <div class="charts-container">
+                        <div class="chart-wrapper">
+                            <h3>Altitude vs Range</h3>
+                            <canvas id="altitudeRangeChart"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h3>Altitude vs Mach</h3>
+                            <canvas id="altitudeMachChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>Advanced Settings</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="warning-box">
+                    <strong>⚠️ NOTIONAL DEMO VALUES</strong><br>
+                    All parameters are purely for demonstration. They do NOT represent any real vehicle.
+                </div>
+                <div id="configEditor" class="config-editor">
+                    <div class="loading">Loading configuration...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelConfigBtn" class="btn btn-secondary">Cancel</button>
+                <button id="saveConfigBtn" class="btn btn-primary">Save & Rebuild Sweep</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- About Modal -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>About</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <h3>Demo Trajectory Generator</h3>
+                <p><strong>Phase 2: Web UI</strong></p>
+                
+                <h4>Features</h4>
+                <ul>
+                    <li>Interactive map-based launch/landing point selection</li>
+                    <li>Real-time feasibility checking against vehicle envelope</li>
+                    <li>Full trajectory computation with altitude and Mach charts</li>
+                    <li>3D visualization with CesiumJS</li>
+                    <li>Advanced vehicle configuration editor</li>
+                </ul>
+                
+                <h4>⚠️ Important Disclaimer</h4>
+                <p>All vehicle parameters and simulation results are <strong>NOTIONAL DEMO VALUES ONLY</strong> for demonstration purposes. They do NOT represent any real vehicle design, operational system, or actual performance characteristics.</p>
+                
+                <h4>Model</h4>
+                <p>3-DOF point-mass simulation with:</p>
+                <ul>
+                    <li>Two-stage vehicle + reentry vehicle (RV)</li>
+                    <li>US Standard Atmosphere 1976</li>
+                    <li>Spherical rotating Earth</li>
+                    <li>Sutton-Graves stagnation heating</li>
+                </ul>
+                
+                <h4>Authentication</h4>
+                <p>This demo uses simple password authentication for single-user access. The password is configured via the <code>APP_PASSWORD</code> environment variable.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 3D Visualization Modal -->
+    <div id="cesiumModal" class="modal">
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header">
+                <h2>3D Trajectory Visualization</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 0;">
+                <div id="cesiumContainer" class="cesium-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p id="loadingMessage">Processing...</p>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
