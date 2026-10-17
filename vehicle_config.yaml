@@ -1,0 +1,48 @@
+# NOTIONAL DEMO VALUES ONLY
+# All parameters in this file are purely for demonstration purposes.
+# They do NOT represent any real vehicle design or performance characteristics.
+
+vehicle:
+  name: demo-vehicle-v0
+  stages:
+    - name: stage_1
+      mass_launch_kg: 6000
+      mass_burnout_kg: 2600
+      thrust_n: 180000
+      isp_s: 250
+      burn_time_s: 55
+    - name: stage_2
+      mass_launch_kg: 2200  # ignition mass, includes RV
+      mass_burnout_kg: 800
+      thrust_n: 60000
+      isp_s: 280
+      burn_time_s: 50
+  stage_separation_coast_s: 3
+  reentry_vehicle:
+    mass_kg: 400
+    separates_after: stage_2_burnout
+  launch:
+    angle_range_deg: [20, 85]
+    azimuth_handled_by: landing_point_bearing
+
+aerodynamics:
+  reference_area_m2: 0.3
+  cd_vs_mach:
+    - [0.0, 0.30]
+    - [1.0, 0.55]
+    - [3.0, 0.40]
+    - [8.0, 0.30]
+  reentry_ballistic_coeff_kg_m2: 4000
+  nose_radius_m: 0.05
+
+limits:
+  max_g_load: 40
+  max_stagnation_heat_flux_w_cm2: 1500
+
+environment:
+  atmosphere: us_standard_1976
+  earth_model: spherical_rotating
+
+sweep:
+  launch_angle_step_deg: 1
+  burn_param_step: 0.05
