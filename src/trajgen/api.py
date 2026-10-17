@@ -3,15 +3,18 @@
 NOTIONAL DEMO SERVICE - All simulation results are for demonstration only.
 """
 
-from fastapi import FastAPI, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, status, Form
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from .config import VehicleConfig, ConfigError
 from .sweep import ReachabilitySweep
 from .feasibility import FeasibilityChecker
+from .auth import PasswordAuthMiddleware, get_required_password, verify_session_token, generate_session_token
 
 
 # Global state
@@ -74,6 +77,52 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan
 )
+
+# Add password authentication middleware
+app.add_middleware(PasswordAuthMiddleware)
+
+# Mount static files (HTML, CSS, JS)
+static_dir = Path(__file__).parent.parent.parent / "static"
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+@app.get("/")
+async def root():
+    """Redirect to main UI."""
+    return RedirectResponse(url="/static/index.html")
+
+
+@app.post("/api/login")
+async def login(password: str = Form(...)) -> Dict[str, Any]:
+    """Login endpoint for password authentication."""
+    required_password = get_required_password()
+    
+    # If no password configured, allow access
+    if required_password is None:
+        return {"success": True, "message": "Authentication disabled"}
+    
+    # Check password
+    import secrets
+    if secrets.compare_digest(password, required_password):
+        token = generate_session_token(password)
+        response = JSONResponse({
+            "success": True,
+            "message": "Login successful"
+        })
+        response.set_cookie(
+            key='session_token',
+            value=token,
+            httponly=True,
+            max_age=86400,  # 24 hours
+            samesite='lax'
+        )
+        return response
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid password"
+        )
 
 
 @app.get("/api/health")
