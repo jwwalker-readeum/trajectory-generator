@@ -4,7 +4,8 @@ NOTIONAL DEMO IMPLEMENTATION - All results are for demonstration only.
 
 Simulation approach:
 - Point-mass 3-DOF in vertical plane (range, altitude, velocity)
-- Gravity turn: after initial pitch-over, thrust vector aligns with velocity vector
+- Linear pitch program: maintains initial angle until threshold altitude/velocity,
+  then gradually pitches down to achieve ballistic trajectory
 - Two powered stages with coast period between
 - RV separation after stage 2 burnout
 - Spherical rotating Earth model
@@ -109,11 +110,12 @@ class TrajectorySimulation:
         trajectory = []
         current_time = 0.0
         current_state = state0.copy()
+        initial_angle_rad = np.radians(launch_angle_deg)
         
         # Stage 1
         success, points, state, error = self._simulate_stage(
             current_state, current_time, vehicle['stages'][0],
-            burn_param, launch_lat, launch_lon, azimuth_deg, "Stage 1"
+            burn_param, launch_lat, launch_lon, azimuth_deg, "Stage 1", initial_angle_rad
         )
         if not success:
             return False, [], error
@@ -125,7 +127,7 @@ class TrajectorySimulation:
         coast_time = vehicle['stage_separation_coast_s']
         success, points, state, error = self._simulate_coast(
             current_state, current_time, coast_time,
-            launch_lat, launch_lon, azimuth_deg, "Coast"
+            launch_lat, launch_lon, azimuth_deg, "Coast", initial_angle_rad
         )
         if not success:
             return False, [], error
@@ -139,7 +141,7 @@ class TrajectorySimulation:
         # Stage 2
         success, points, state, error = self._simulate_stage(
             current_state, current_time, vehicle['stages'][1],
-            burn_param, launch_lat, launch_lon, azimuth_deg, "Stage 2"
+            burn_param, launch_lat, launch_lon, azimuth_deg, "Stage 2", initial_angle_rad
         )
         if not success:
             return False, [], error
@@ -154,7 +156,7 @@ class TrajectorySimulation:
         # RV reentry
         success, points, state, error = self._simulate_reentry(
             current_state, current_time, rv_mass,
-            launch_lat, launch_lon, azimuth_deg, "Reentry"
+            launch_lat, launch_lon, azimuth_deg, "Reentry", initial_angle_rad
         )
         if not success:
             return False, [], error
@@ -169,6 +171,7 @@ class TrajectorySimulation:
         thrust_n: float,
         mass_flow_kg_s: float,
         mass_current: float,
+        initial_angle_rad: float,
         use_ballistic_coeff: bool = False
     ) -> np.ndarray:
         """Equations of motion for powered or ballistic flight.
@@ -199,10 +202,6 @@ class TrajectorySimulation:
         R = EARTH_RADIUS_M + h
         g = G0 * (EARTH_RADIUS_M / R)**2
         
-        # Centrifugal effect from Earth rotation
-        omega = EARTH_ROTATION_RATE
-        v_rot = omega * R * np.cos(np.radians(45))  # Approximate latitude effect
-        
         # Accelerations
         if m > 0:
             a_thrust = thrust_n / m
@@ -212,20 +211,28 @@ class TrajectorySimulation:
             a_drag = 0
         
         # Flight dynamics
-        # Thrust aligned with velocity direction (gravity turn)
+        # Thrust aligned with velocity direction
         dv_dt = a_thrust - a_drag - g * np.sin(gamma)
         
         # d(flight_path_angle)/dt
-        # Simplified pitch program: gradual turn after sufficient altitude/velocity
-        if thrust_n > 0 and h > 5000 and v > 200:
-            # Active pitch-down only at high altitude/velocity
-            dgamma_dt = -0.005  # Gentle pitch-down rate (rad/s)
-        elif v > 10.0:
-            # Natural trajectory curvature from centrifugal and gravity
-            a_centrifugal = v**2 / R
-            dgamma_dt = (a_centrifugal - g * np.cos(gamma)) / v
+        # Linear pitch program for powered flight
+        if thrust_n > 0:
+            # Hold initial angle until reaching altitude threshold, then pitch down
+            if h < 20000:  # Below 20 km, hold initial angle
+                dgamma_dt = 0
+            elif h < 80000:  # 20-80 km, gradual pitch down
+                dgamma_dt = -0.01  # rad/s pitch rate
+            else:
+                # Above 80 km, let trajectory naturally turn
+                a_centrifugal = v**2 / R if v > 0 else 0
+                dgamma_dt = (a_centrifugal - g * np.cos(gamma)) / v if v > 0 else 0
         else:
-            dgamma_dt = 0
+            # Unpowered: natural trajectory curvature
+            if v > 1.0:
+                a_centrifugal = v**2 / R
+                dgamma_dt = (a_centrifugal - g * np.cos(gamma)) / v
+            else:
+                dgamma_dt = 0
         
         # d(altitude)/dt
         dh_dt = v * np.sin(gamma)
@@ -247,7 +254,8 @@ class TrajectorySimulation:
         launch_lat: float,
         launch_lon: float,
         azimuth_deg: float,
-        phase_name: str
+        phase_name: str,
+        initial_angle_rad: float
     ) -> Tuple[bool, List[TrajectoryPoint], np.ndarray, str]:
         """Simulate a powered stage."""
         thrust = stage_config['thrust_n'] * burn_param
@@ -255,7 +263,7 @@ class TrajectorySimulation:
         mass_flow = (stage_config['mass_launch_kg'] - stage_config['mass_burnout_kg']) / burn_time
         
         def eom(t, y):
-            return self._equations_of_motion(t, y, thrust, mass_flow, y[4])
+            return self._equations_of_motion(t, y, thrust, mass_flow, y[4], initial_angle_rad)
         
         def event_ground(t, y):
             return y[1]  # altitude
@@ -268,7 +276,7 @@ class TrajectorySimulation:
                 state0,
                 method='RK45',
                 events=event_ground,
-                max_step=0.5,
+                max_step=1.0,
                 rtol=1e-6
             )
         except Exception as e:
@@ -296,11 +304,12 @@ class TrajectorySimulation:
         launch_lat: float,
         launch_lon: float,
         azimuth_deg: float,
-        phase_name: str
+        phase_name: str,
+        initial_angle_rad: float
     ) -> Tuple[bool, List[TrajectoryPoint], np.ndarray, str]:
         """Simulate coast phase."""
         def eom(t, y):
-            return self._equations_of_motion(t, y, 0.0, 0.0, y[4])
+            return self._equations_of_motion(t, y, 0.0, 0.0, y[4], initial_angle_rad)
         
         def event_ground(t, y):
             return y[1]
@@ -313,7 +322,7 @@ class TrajectorySimulation:
                 state0,
                 method='RK45',
                 events=event_ground,
-                max_step=0.5,
+                max_step=1.0,
                 rtol=1e-6
             )
         except Exception as e:
@@ -338,11 +347,12 @@ class TrajectorySimulation:
         launch_lat: float,
         launch_lon: float,
         azimuth_deg: float,
-        phase_name: str
+        phase_name: str,
+        initial_angle_rad: float
     ) -> Tuple[bool, List[TrajectoryPoint], np.ndarray, str]:
         """Simulate RV reentry with ballistic coefficient."""
         def eom(t, y):
-            return self._equations_of_motion(t, y, 0.0, 0.0, rv_mass, use_ballistic_coeff=True)
+            return self._equations_of_motion(t, y, 0.0, 0.0, rv_mass, initial_angle_rad, use_ballistic_coeff=True)
         
         def event_ground(t, y):
             return y[1]  # altitude - stop at ground
@@ -352,11 +362,11 @@ class TrajectorySimulation:
         try:
             sol = solve_ivp(
                 eom,
-                (t0, t0 + 600),  # Max 10 minutes for reentry
+                (t0, t0 + 1200),  # Max 20 minutes for reentry
                 state0,
                 method='RK45',
                 events=event_ground,
-                max_step=0.5,
+                max_step=1.0,
                 rtol=1e-6
             )
         except Exception as e:

@@ -113,3 +113,31 @@ def test_find_nearest_parameters():
             assert 20 <= angle <= 95  # Allow some tolerance
             assert 0.5 <= burn_param <= 1.0
             assert achieved_range >= 0
+
+
+def test_default_envelope_is_icbm_scale():
+    """Test that default config produces ICBM-scale ranges (target ~2500-2900 km)."""
+    config = VehicleConfig()
+    
+    # Use coarser sweep for faster testing
+    config['sweep']['launch_angle_step_deg'] = 5
+    config['sweep']['burn_param_step'] = 0.1
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        sweep = ReachabilitySweep(config, cache_dir=Path(tmpdir))
+        sweep.build()
+        
+        min_range, max_range = sweep.get_range_bounds()
+        
+        # Assert we have a non-trivial envelope
+        assert max_range > 100, f"Max range {max_range:.1f} km is too small for useful demo"
+        
+        # Assert envelope reaches ICBM-scale ranges
+        assert max_range > 2000, f"Max range {max_range:.1f} km should reach ICBM scale (~2500+ km)"
+        
+        # Verify we have feasible points in the mid-range
+        feasible_ranges = sweep.get_feasible_ranges()
+        assert len(feasible_ranges) > 5, "Should have multiple feasible trajectories"
+        
+        mid_range_points = [r for r in feasible_ranges if 1000 < r < 2500]
+        assert len(mid_range_points) > 0, "Should have feasible points in mid-range (1000-2500 km)"

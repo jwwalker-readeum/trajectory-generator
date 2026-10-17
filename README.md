@@ -204,6 +204,18 @@ Compute full trajectory for a launch-landing pair (if feasible).
 
 The vehicle configuration is stored in `vehicle_config.yaml` at the repository root. The configuration path can be overridden with the `VEHICLE_CONFIG_PATH` environment variable.
 
+### Notional Parameter Tuning
+
+The default notional vehicle parameters have been tuned to produce **ICBM-scale demonstration ranges** (~400-3000 km ground range) suitable for map-based visualization. Key adjustments from initial placeholder values:
+
+- **Burn times**: Increased to 65s for both stages (from 55s/50s) for longer powered flight
+- **Specific impulse**: Improved to 265s/295s (from 250s/280s) for higher efficiency
+- **Mass ratios**: Adjusted for better performance while maintaining structural feasibility
+- **Nose radius**: Increased to 0.10m (from 0.05m) to reduce Sutton-Graves stagnation heating
+- **Ballistic coefficient**: Increased to 5000 kg/m² (from 4000) for better reentry characteristics
+
+These changes keep the simulation within the configured limits (g-load < 40, heat flux < 1500 W/cm²) while producing useful demonstration trajectories.
+
 ### Configuration Structure
 
 ```yaml
@@ -212,16 +224,16 @@ vehicle:
   stages:
     - name: stage_1
       mass_launch_kg: 6000
-      mass_burnout_kg: 2600
+      mass_burnout_kg: 2200
       thrust_n: 180000
-      isp_s: 250
-      burn_time_s: 55
+      isp_s: 265
+      burn_time_s: 65
     - name: stage_2
       mass_launch_kg: 2200
-      mass_burnout_kg: 800
-      thrust_n: 60000
-      isp_s: 280
-      burn_time_s: 50
+      mass_burnout_kg: 700
+      thrust_n: 65000
+      isp_s: 295
+      burn_time_s: 65
   stage_separation_coast_s: 3
   reentry_vehicle:
     mass_kg: 400
@@ -275,10 +287,12 @@ sweep:
 
 ### Guidance
 
-The simulation uses a **gravity turn** approach:
-- Initial launch angle set by parameter sweep
-- After pitch-over, thrust vector aligns with velocity vector
-- Natural trajectory shaping from aerodynamics and gravity
+The simulation uses a **linear pitch program** for ICBM-scale trajectories:
+- Initial launch angle set by parameter sweep (20-85°)
+- **Below 20 km altitude**: Hold initial launch angle (vertical climb phase)
+- **20-80 km altitude**: Gradual pitch-down at 0.01 rad/s (pitch-over phase)
+- **Above 80 km**: Natural ballistic arc from centrifugal and gravity effects
+- Thrust always aligned with velocity vector (zero angle of attack assumption)
 
 ### Constraints
 
