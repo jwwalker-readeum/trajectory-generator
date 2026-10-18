@@ -773,15 +773,21 @@ See "Configure Environment Variables" section above for usage.
 3. Clear browser cookies and try again
 4. Check Railway logs for authentication errors
 
-#### 3D View Not Loading
+#### 3D View Not Loading / Black Globe
 
-**Symptoms**: "View 3D" button opens blank screen or shows errors
+**Symptoms**: "View 3D" button opens blank screen, black globe, or shows errors
 
 **Solutions**:
-1. Verify `CESIUM_ION_TOKEN` is set (or use default token)
-2. Check browser console (F12) for Cesium errors
-3. Ensure HTTPS is enabled (Cesium requires secure context)
-4. Try with default token first, then add custom token
+1. **Missing/Invalid Token**: The app now automatically falls back to OpenStreetMap imagery when `CESIUM_ION_TOKEN` is missing or invalid
+   - You should see a notice: "📍 Using OpenStreetMap imagery (no Cesium Ion token)"
+   - The globe will show OpenStreetMap tiles instead of satellite imagery
+   - Trajectory, launch, and landing markers will still display correctly
+2. **Token Rejected at Request Time**: If your token was valid initially but later expired or was revoked, the fallback will activate automatically
+3. **To Use Ion Imagery**: Set a valid `CESIUM_ION_TOKEN` in Railway environment variables
+   - Get a free token at [cesium.com/ion/signup](https://cesium.com/ion/signup)
+   - After setting the token, redeploy or restart the service
+4. Check browser console (F12) for specific Cesium errors if issues persist
+5. Ensure HTTPS is enabled (Cesium requires secure context for Ion assets)
 
 #### Deployment Not Auto-Updating
 

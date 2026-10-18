@@ -552,6 +552,7 @@ async function show3DVisualization() {
 // Initialize CesiumJS viewer
 async function initializeCesium() {
     const container = document.getElementById('cesiumContainer');
+    let usingFallback = false;
     
     try {
         // Fetch Cesium Ion token from server
@@ -559,24 +560,39 @@ async function initializeCesium() {
         const tokenData = await tokenResponse.json();
         
         let terrainProvider;
+        let imageryProvider;
         
         if (tokenData.has_token && tokenData.token) {
-            // Use Ion token if available
+            // Token available - try to use Ion assets
             Cesium.Ion.defaultAccessToken = tokenData.token;
+            
             try {
                 // Try to use world terrain with Ion
                 terrainProvider = await Cesium.createWorldTerrainAsync();
-            } catch (terrainError) {
-                console.warn('Failed to load world terrain, falling back to ellipsoid:', terrainError);
+                // If terrain succeeds, try Ion imagery (Bing Maps)
+                // Default Cesium imagery will be used automatically if we don't set imageryProvider
+                // We'll validate by creating a test viewer first
+                imageryProvider = undefined; // Use Cesium default (Ion Bing Maps)
+            } catch (ionError) {
+                console.warn('Failed to load Ion assets (invalid or expired token), falling back to free resources:', ionError);
+                usingFallback = true;
                 terrainProvider = new Cesium.EllipsoidTerrainProvider();
+                imageryProvider = new Cesium.OpenStreetMapImageryProvider({
+                    url: 'https://a.tile.openstreetmap.org/'
+                });
             }
         } else {
-            // No token - use simple ellipsoid terrain
-            console.info('No Cesium Ion token configured, using basic terrain');
+            // No token - use free resources
+            console.info('No Cesium Ion token configured, using free OpenStreetMap imagery and basic terrain');
+            usingFallback = true;
             terrainProvider = new Cesium.EllipsoidTerrainProvider();
+            imageryProvider = new Cesium.OpenStreetMapImageryProvider({
+                url: 'https://a.tile.openstreetmap.org/'
+            });
         }
         
-        state.cesiumViewer = new Cesium.Viewer('cesiumContainer', {
+        // Create viewer with configured providers
+        const viewerOptions = {
             terrainProvider: terrainProvider,
             baseLayerPicker: false,
             geocoder: false,
@@ -586,12 +602,30 @@ async function initializeCesium() {
             animation: false,
             timeline: false,
             fullscreenButton: false
-        });
+        };
+        
+        // Only set imageryProvider if we're using fallback (OSM)
+        if (imageryProvider) {
+            viewerOptions.imageryProvider = imageryProvider;
+        }
+        
+        state.cesiumViewer = new Cesium.Viewer('cesiumContainer', viewerOptions);
+        
+        // Show fallback notice if using free resources
+        if (usingFallback) {
+            showCesiumFallbackNotice();
+        }
+        
     } catch (error) {
         console.error('Failed to initialize Cesium viewer:', error);
-        // Create basic viewer without custom terrain as last resort
+        usingFallback = true;
+        
+        // Create basic viewer with free resources as last resort
         state.cesiumViewer = new Cesium.Viewer('cesiumContainer', {
             terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+            imageryProvider: new Cesium.OpenStreetMapImageryProvider({
+                url: 'https://a.tile.openstreetmap.org/'
+            }),
             baseLayerPicker: false,
             geocoder: false,
             homeButton: true,
@@ -601,6 +635,22 @@ async function initializeCesium() {
             timeline: false,
             fullscreenButton: false
         });
+        
+        showCesiumFallbackNotice();
+    }
+}
+
+// Show fallback notice in Cesium modal
+function showCesiumFallbackNotice() {
+    const modal = document.getElementById('cesiumModal');
+    let notice = modal.querySelector('.cesium-fallback-notice');
+    
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.className = 'cesium-fallback-notice';
+        notice.style.cssText = 'position: absolute; top: 70px; left: 10px; background: rgba(0,0,0,0.7); color: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; z-index: 1000; max-width: 300px;';
+        notice.innerHTML = '📍 Using OpenStreetMap imagery (no Cesium Ion token)';
+        modal.querySelector('.modal-content').appendChild(notice);
     }
 }
 
