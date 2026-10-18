@@ -122,13 +122,16 @@ This installs:
 
 ### Step 4: Configure Environment Variables (Optional)
 
-Create a `.env` file in the project root (or export environment variables):
+**The service automatically loads environment variables from a `.env` file in the project root**, making it easy to configure credentials for local development without exporting shell variables.
+
+Create a `.env` file:
 
 ```bash
 # Copy the example file
 cp .env.example .env
 
-# Edit .env with your values
+# Edit .env with your values (use any text editor)
+nano .env
 ```
 
 **Environment Variables:**
@@ -158,6 +161,14 @@ APP_PASSWORD=demo123
 
 CESIUM_ION_TOKEN=your_token_here
 ```
+
+**Important Notes:**
+
+- **Values are loaded from `.env` automatically** when you run the service (via `python-dotenv`)
+- **Existing environment variables take precedence** over `.env` values (important for Railway deployment)
+- **No need to use quotes** around values in `.env` files (quotes are automatically stripped)
+- **Whitespace is trimmed** from both keys and values
+- **Never commit `.env` to git** (already in `.gitignore`)
 
 ### Step 5: Run the Service
 
@@ -1072,6 +1083,39 @@ Then visit `http://localhost:8000` in your browser.
 5. Copy the token and set as `CESIUM_ION_TOKEN` environment variable
 
 The **default token** works but may have rate limits. Your personal token provides better imagery and higher quotas.
+
+### Q: My `.env` file isn't being loaded / Cesium token not working
+
+**A:** If you've created a `.env` file but the values aren't being picked up:
+
+1. **Check file location**: The `.env` file must be in the **project root** (same directory as `vehicle_config.yaml` and `requirements.txt`), not in `src/` or any subdirectory.
+
+2. **Check file format**: 
+   - Use simple `KEY=value` format (one per line)
+   - No spaces around the `=` sign: use `CESIUM_ION_TOKEN=abc123`, not `CESIUM_ION_TOKEN = abc123`
+   - Don't use quotes unless the value itself contains quotes
+   - Comments start with `#`
+
+3. **Verify the token in the API response**:
+   ```bash
+   curl http://localhost:8000/api/cesium-token
+   ```
+   This should return `{"token": "your_token", "has_token": true}` if loaded correctly.
+
+4. **Check for typos**: Variable names are case-sensitive. Use `CESIUM_ION_TOKEN` (not `cesium_ion_token` or `CesiumIonToken`).
+
+5. **Restart the service**: Changes to `.env` are only loaded when the service starts. After editing `.env`, restart the server:
+   - Press `Ctrl+C` to stop
+   - Run `python -m src.trajgen.main` again
+
+6. **Check for whitespace/quotes**: 
+   - ✅ Correct: `CESIUM_ION_TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+   - ❌ Wrong: `CESIUM_ION_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+   - ❌ Wrong: `CESIUM_ION_TOKEN= eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` (leading space)
+
+7. **Environment variables take precedence**: If you previously exported the variable in your shell (`export CESIUM_ION_TOKEN=...`), that value will be used instead of the `.env` file. Unset it with `unset CESIUM_ION_TOKEN` or start a fresh terminal.
+
+8. **Check Railway deployment**: On Railway, environment variables are set through the Railway dashboard (Variables tab), **not** through a `.env` file. The `.env` file is only for local development.
 
 ---
 
