@@ -12,7 +12,8 @@ const state = {
     lastFeasibilityResult: null,
     lastTrajectory: null,
     altitudeRangeChart: null,
-    altitudeMachChart: null,
+    altitudeTimeChart: null,
+    machTimeChart: null,
     cesiumViewer: null,
     currentConfig: null
 };
@@ -354,9 +355,14 @@ function displayTrajectoryCharts(trajectory) {
         y: p.altitude_m / 1000 // Convert to km
     }));
     
-    const machData = trajectory.map(p => ({
-        x: p.mach,
-        y: p.altitude_m / 1000
+    const altitudeTimeData = trajectory.map(p => ({
+        x: p.time_s,
+        y: p.altitude_m / 1000 // Convert to km
+    }));
+    
+    const machTimeData = trajectory.map(p => ({
+        x: p.time_s,
+        y: p.mach
     }));
     
     // Altitude vs Range Chart
@@ -413,19 +419,19 @@ function displayTrajectoryCharts(trajectory) {
         }
     });
     
-    // Altitude vs Mach Chart
-    const altMachCtx = document.getElementById('altitudeMachChart').getContext('2d');
+    // Altitude vs Time Chart
+    const altTimeCtx = document.getElementById('altitudeTimeChart').getContext('2d');
     
-    if (state.altitudeMachChart) {
-        state.altitudeMachChart.destroy();
+    if (state.altitudeTimeChart) {
+        state.altitudeTimeChart.destroy();
     }
     
-    state.altitudeMachChart = new Chart(altMachCtx, {
+    state.altitudeTimeChart = new Chart(altTimeCtx, {
         type: 'line',
         data: {
             datasets: [{
-                label: 'Trajectory',
-                data: machData,
+                label: 'Altitude',
+                data: altitudeTimeData,
                 borderColor: '#f59e0b',
                 backgroundColor: 'rgba(245, 158, 11, 0.1)',
                 borderWidth: 2,
@@ -443,7 +449,7 @@ function displayTrajectoryCharts(trajectory) {
                 },
                 tooltip: {
                     callbacks: {
-                        label: (context) => `Alt: ${context.parsed.y.toFixed(1)} km, Mach: ${context.parsed.x.toFixed(1)}`
+                        label: (context) => `Alt: ${context.parsed.y.toFixed(1)} km, Time: ${context.parsed.x.toFixed(1)} s`
                     }
                 }
             },
@@ -452,7 +458,7 @@ function displayTrajectoryCharts(trajectory) {
                     type: 'linear',
                     title: {
                         display: true,
-                        text: 'Mach Number'
+                        text: 'Time (s)'
                     },
                     beginAtZero: true
                 },
@@ -467,10 +473,65 @@ function displayTrajectoryCharts(trajectory) {
             }
         }
     });
+    
+    // Mach vs Time Chart
+    const machTimeCtx = document.getElementById('machTimeChart').getContext('2d');
+    
+    if (state.machTimeChart) {
+        state.machTimeChart.destroy();
+    }
+    
+    state.machTimeChart = new Chart(machTimeCtx, {
+        type: 'line',
+        data: {
+            datasets: [{
+                label: 'Mach Number',
+                data: machTimeData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                borderWidth: 2,
+                pointRadius: 0,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => `Mach: ${context.parsed.y.toFixed(2)}, Time: ${context.parsed.x.toFixed(1)} s`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Time (s)'
+                    },
+                    beginAtZero: true
+                },
+                y: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Mach Number'
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }
 
 // Show 3D Visualization
-function show3DVisualization() {
+async function show3DVisualization() {
     if (!state.lastTrajectory || state.lastTrajectory.length === 0) {
         alert('No trajectory data available');
         return;
@@ -481,7 +542,7 @@ function show3DVisualization() {
     
     // Initialize Cesium if not already done
     if (!state.cesiumViewer) {
-        initializeCesium();
+        await initializeCesium();
     }
     
     // Update trajectory
@@ -489,26 +550,58 @@ function show3DVisualization() {
 }
 
 // Initialize CesiumJS viewer
-function initializeCesium() {
+async function initializeCesium() {
     const container = document.getElementById('cesiumContainer');
     
-    // Check for Ion token
-    const ionToken = 'YOUR_ION_TOKEN_HERE'; // Will be replaced or use default
-    if (ionToken && ionToken !== 'YOUR_ION_TOKEN_HERE') {
-        Cesium.Ion.defaultAccessToken = ionToken;
+    try {
+        // Fetch Cesium Ion token from server
+        const tokenResponse = await fetch('/api/cesium-token');
+        const tokenData = await tokenResponse.json();
+        
+        let terrainProvider;
+        
+        if (tokenData.has_token && tokenData.token) {
+            // Use Ion token if available
+            Cesium.Ion.defaultAccessToken = tokenData.token;
+            try {
+                // Try to use world terrain with Ion
+                terrainProvider = await Cesium.createWorldTerrainAsync();
+            } catch (terrainError) {
+                console.warn('Failed to load world terrain, falling back to ellipsoid:', terrainError);
+                terrainProvider = new Cesium.EllipsoidTerrainProvider();
+            }
+        } else {
+            // No token - use simple ellipsoid terrain
+            console.info('No Cesium Ion token configured, using basic terrain');
+            terrainProvider = new Cesium.EllipsoidTerrainProvider();
+        }
+        
+        state.cesiumViewer = new Cesium.Viewer('cesiumContainer', {
+            terrainProvider: terrainProvider,
+            baseLayerPicker: false,
+            geocoder: false,
+            homeButton: true,
+            sceneModePicker: true,
+            navigationHelpButton: false,
+            animation: false,
+            timeline: false,
+            fullscreenButton: false
+        });
+    } catch (error) {
+        console.error('Failed to initialize Cesium viewer:', error);
+        // Create basic viewer without custom terrain as last resort
+        state.cesiumViewer = new Cesium.Viewer('cesiumContainer', {
+            terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+            baseLayerPicker: false,
+            geocoder: false,
+            homeButton: true,
+            sceneModePicker: true,
+            navigationHelpButton: false,
+            animation: false,
+            timeline: false,
+            fullscreenButton: false
+        });
     }
-    
-    state.cesiumViewer = new Cesium.Viewer('cesiumContainer', {
-        terrainProvider: Cesium.createWorldTerrain(),
-        baseLayerPicker: false,
-        geocoder: false,
-        homeButton: true,
-        sceneModePicker: true,
-        navigationHelpButton: false,
-        animation: false,
-        timeline: false,
-        fullscreenButton: false
-    });
 }
 
 // Display trajectory in Cesium

@@ -139,6 +139,25 @@ async def health() -> Dict[str, str]:
     }
 
 
+@app.get("/api/cesium-token")
+async def get_cesium_token() -> Dict[str, Any]:
+    """Get Cesium Ion token from environment.
+    
+    Returns the token if set, or null if not configured.
+    """
+    import os
+    token = os.environ.get('CESIUM_ION_TOKEN', None)
+    
+    # Don't expose the placeholder value
+    if token == 'YOUR_ION_TOKEN_HERE':
+        token = None
+    
+    return {
+        "token": token,
+        "has_token": token is not None
+    }
+
+
 @app.get("/api/config")
 async def get_config() -> Dict[str, Any]:
     """Get current vehicle configuration."""
