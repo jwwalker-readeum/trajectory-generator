@@ -6,6 +6,11 @@ Or: python -m trajgen.main
 
 import sys
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env file if present (must be before other imports that use os.environ)
+# override=False ensures existing environment variables (e.g. from Railway) are not overwritten
+load_dotenv(override=False)
 
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
