@@ -42,7 +42,13 @@ function initializeMap() {
 
 // Handle map click for setting launch/landing points
 function handleMapClick(e) {
-    const { lat, lng } = e.latlng;
+    // Normalize coordinates - Leaflet can return lng outside [-180, 180] on wrapped maps
+    const wrapped = e.latlng.wrap();
+    let lat = wrapped.lat;
+    let lng = wrapped.lng;
+    
+    // Clamp latitude to valid range [-90, 90] (shouldn't be needed but be defensive)
+    lat = Math.max(-90, Math.min(90, lat));
     
     if (!state.launch) {
         // Set launch point
@@ -253,7 +259,26 @@ async function checkFeasibility() {
         });
         
         if (!response.ok) {
-            throw new Error('Feasibility check failed');
+            // Extract error details from response
+            let errorMessage = 'Feasibility check failed';
+            try {
+                const errorData = await response.json();
+                if (response.status === 422 && errorData.detail) {
+                    // Validation error - show which field failed
+                    if (Array.isArray(errorData.detail)) {
+                        const fields = errorData.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('\n');
+                        errorMessage = `Invalid input:\n${fields}`;
+                    } else {
+                        errorMessage = `Invalid input: ${errorData.detail}`;
+                    }
+                } else if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                }
+            } catch (e) {
+                // If we can't parse the error, use status text
+                errorMessage = `Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
         const result = await response.json();
@@ -263,7 +288,7 @@ async function checkFeasibility() {
         updateInfoDisplay();
     } catch (error) {
         console.error('Error checking feasibility:', error);
-        alert('Failed to check feasibility. Please try again.');
+        alert(error.message);
     } finally {
         hideLoading();
     }
@@ -286,7 +311,26 @@ async function computeTrajectory() {
         });
         
         if (!response.ok) {
-            throw new Error('Trajectory computation failed');
+            // Extract error details from response
+            let errorMessage = 'Trajectory computation failed';
+            try {
+                const errorData = await response.json();
+                if (response.status === 422 && errorData.detail) {
+                    // Validation error - show which field failed
+                    if (Array.isArray(errorData.detail)) {
+                        const fields = errorData.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('\n');
+                        errorMessage = `Invalid input:\n${fields}`;
+                    } else {
+                        errorMessage = `Invalid input: ${errorData.detail}`;
+                    }
+                } else if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                }
+            } catch (e) {
+                // If we can't parse the error, use status text
+                errorMessage = `Error ${response.status}: ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
         }
         
         const result = await response.json();
@@ -303,7 +347,7 @@ async function computeTrajectory() {
         updateInfoDisplay();
     } catch (error) {
         console.error('Error computing trajectory:', error);
-        alert('Failed to compute trajectory. Please try again.');
+        alert(error.message);
     } finally {
         hideLoading();
     }

@@ -6,7 +6,7 @@ NOTIONAL DEMO SERVICE - All simulation results are for demonstration only.
 from fastapi import FastAPI, HTTPException, status, Form
 from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, List
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,9 +26,33 @@ app_state = {
 
 
 class LatLon(BaseModel):
-    """Latitude and longitude."""
+    """Latitude and longitude with defensive coordinate normalization.
+    
+    Frontend should normalize coordinates, but we also wrap server-side
+    to handle edge cases (e.g., clicks on wrapped Leaflet world copies).
+    """
     lat: float = Field(..., ge=-90, le=90, description="Latitude in degrees")
-    lon: float = Field(..., ge=-180, le=180, description="Longitude in degrees")
+    lon: float = Field(..., description="Longitude in degrees (will be wrapped to [-180, 180])")
+    
+    @field_validator('lon', mode='before')
+    @classmethod
+    def wrap_longitude(cls, v: float) -> float:
+        """Wrap longitude to [-180, 180] range before validation.
+        
+        This handles cases where Leaflet returns coordinates outside the standard
+        range when users click on wrapped copies of the world map.
+        
+        Examples:
+            -215.419922 -> 144.580078
+            -236.953125 -> 123.046875
+            400.0 -> 40.0
+        """
+        # Wrap to [-180, 180] range
+        while v > 180:
+            v -= 360
+        while v < -180:
+            v += 360
+        return v
 
 
 class FeasibilityRequest(BaseModel):

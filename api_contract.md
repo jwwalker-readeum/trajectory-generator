@@ -2,7 +2,17 @@
 
 **NOTIONAL DEMO SERVICE** - All simulation results are for demonstration only.
 
-This document defines the contract between the frontend (`static/app.js`) and backend API (`src/trajgen/api.py`). Keep this in sync when making changes to either side.
+This document defines the contract between the frontend (`static/app.js`) and backend API (`src/trajgen/api.py`).
+
+## Critical: Coordinate Normalization
+
+**Frontend must normalize coordinates before sending:**
+- Longitude: Use `latlng.wrap()` to ensure [-180, 180] range (Leaflet can return values outside this on wrapped maps)
+- Latitude: Clamp to [-90, 90]
+
+**Backend validates:**
+- Rejects lat outside [-90, 90] with 422
+- Rejects lon outside [-180, 180] with 422
 
 ## API Endpoints
 
@@ -217,63 +227,18 @@ Get the Cesium Ion access token for 3D terrain.
 
 ## Testing
 
-Run UI contract tests to verify frontend/backend compatibility:
-
+Run UI contract tests:
 ```bash
-python3 -m pytest tests/test_ui_contract.py -v
+pytest tests/test_ui_contract.py -v
 ```
 
-These tests use the exact payload format sent by the frontend to ensure the API returns the expected response structure.
+Tests verify the exact payload format sent by the frontend matches API expectations.
 
-## Preventing Contract Drift
+## Common 422 Validation Errors
 
-1. **Always run tests** before committing changes to API endpoints or frontend code
-2. **Update this document** when adding or modifying endpoints
-3. **Add new test cases** in `tests/test_ui_contract.py` for new fields or endpoints
-4. **Review Pydantic models** in `src/trajgen/api.py` to ensure they match frontend expectations
-5. **Check frontend code** in `static/app.js` for all places that use API responses
+1. **Longitude out of range** - Leaflet returns lon outside [-180, 180] on wrapped maps (FIXED: frontend now normalizes)
+2. **Missing Content-Type** - Must be `application/json`
+3. **Invalid coordinates** - lat must be [-90, 90], lon must be [-180, 180]
+4. **Missing fields** - Both `launch` and `landing` with `lat` and `lon` required
 
-## Common Issues
-
-### 422 Unprocessable Entity
-
-This error occurs when the request body fails validation. Common causes:
-
-1. **Missing Content-Type header** - Must be `application/json`
-2. **Invalid lat/lon values** - Must be in valid ranges
-3. **Missing required fields** - Both `launch` and `landing` with `lat` and `lon`
-4. **Wrong data types** - All coordinates must be numbers
-
-### Missing Response Fields
-
-If the frontend displays "N/A" or errors accessing fields:
-
-1. Check that all fields in `FeasibilityResult` are included in API response
-2. Verify trajectory points include all required fields
-3. Ensure null values are explicitly returned (not omitted)
-
-## Example Valid Requests
-
-### Feasible Case (Cape Canaveral to mid-Atlantic)
-```json
-{
-  "launch": {"lat": 28.5, "lon": -80.6},
-  "landing": {"lat": 30.0, "lon": -70.0}
-}
-```
-
-### Infeasible Case (too far)
-```json
-{
-  "launch": {"lat": 28.5, "lon": -80.6},
-  "landing": {"lat": 60.0, "lon": 30.0}
-}
-```
-
-### Infeasible Case (too short)
-```json
-{
-  "launch": {"lat": 28.5, "lon": -80.6},
-  "landing": {"lat": 28.6, "lon": -80.5}
-}
-```
+Frontend now shows specific validation errors instead of generic "Failed to check feasibility" message.
