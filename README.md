@@ -237,7 +237,8 @@ The service will:
 - Click the **"Compute Trajectory"** button
 - Results appear with:
   - **Altitude vs Range Chart**: Trajectory profile in vertical plane
-  - **Altitude vs Mach Chart**: Speed profile during flight
+  - **Altitude vs Time Chart**: Altitude profile over mission duration
+  - **Mach vs Time Chart**: Speed profile during flight
   - **Trajectory Details**: Phase breakdowns, peak values
   - Constraint violations highlighted in red if any
 - This performs a **full simulation** and takes slightly longer
