@@ -109,6 +109,10 @@
                             <h3>Mach vs Time</h3>
                             <canvas id="machTimeChart"></canvas>
                         </div>
+                        <div class="chart-wrapper">
+                            <h3>G-Load vs Time</h3>
+                            <canvas id="gLoadTimeChart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -153,7 +157,7 @@
                 <ul>
                     <li>Interactive map-based launch/landing point selection</li>
                     <li>Real-time feasibility checking against vehicle envelope</li>
-                    <li>Full trajectory computation with altitude, Mach, and time-series charts</li>
+                    <li>Full trajectory computation with altitude, Mach, g-load, and time-series charts</li>
                     <li>3D visualization with CesiumJS</li>
                     <li>Advanced vehicle configuration editor</li>
                 </ul>
@@ -198,6 +202,7 @@
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cesium.com/downloads/cesiumjs/releases/1.111/Build/Cesium/Cesium.js"></script>
     <script src="/static/app.js"></script>
 </body>
