@@ -43,7 +43,7 @@ This service demonstrates a simplified 3-DOF (three-degree-of-freedom) ballistic
 ### Phase 2: Web Interface
 - **Interactive Map**: Click to set launch and landing points (Leaflet + OpenStreetMap)
 - **Real-Time Feasibility**: Instant feedback on whether a mission is achievable
-- **Trajectory Charts**: Altitude vs Range and Altitude vs Mach visualizations
+- **Trajectory Charts**: Altitude vs Range, Altitude vs Time, Mach vs Time, and G-Load vs Time visualizations
 - **3D Visualization**: CesiumJS globe view of trajectory path
 - **Advanced Settings**: In-browser vehicle configuration editor
 - **Password Authentication**: Simple login for demo deployments
@@ -250,6 +250,7 @@ The service will:
   - **Altitude vs Range Chart**: Trajectory profile in vertical plane
   - **Altitude vs Time Chart**: Altitude profile over mission duration
   - **Mach vs Time Chart**: Speed profile during flight
+  - **G-Load vs Time Chart**: Acceleration profile with peak marker and limit line
   - **Trajectory Details**: Phase breakdowns, peak values
   - Constraint violations highlighted in red if any
 - This performs a **full simulation** and takes slightly longer

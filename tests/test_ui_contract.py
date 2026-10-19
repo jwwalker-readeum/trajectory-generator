@@ -159,6 +159,7 @@ class TestTrajectoryEndpointUIContract:
                 "range_m",         # Used in rangeData (line 354)
                 "altitude_m",      # Used in both charts (lines 355, 360)
                 "mach",            # Used in machTimeData (line 365)
+                "g_load",          # Used in gLoadTimeData (G-Load chart)
                 "latitude_deg",    # Used in 3D viz (line 618)
                 "longitude_deg",   # Used in 3D viz (line 617)
             ]
@@ -174,6 +175,34 @@ class TestTrajectoryEndpointUIContract:
             assert "longitude_deg" in last_point, "Last point must have longitude_deg"
         else:
             assert data["trajectory"] is None, "trajectory should be None for infeasible case"
+    
+    def test_gload_consistency(self, client):
+        """Test that per-point g_load max matches peak_g_load summary.
+        
+        The trajectory's max g_load should match the top-level peak_g_load
+        field to ensure consistency between the chart and the summary.
+        """
+        payload = {
+            "launch": {"lat": 28.5, "lon": -80.6},
+            "landing": {"lat": 30.0, "lon": -70.0}
+        }
+        
+        response = client.post("/api/trajectory", json=payload)
+        assert response.status_code == 200
+        
+        data = response.json()
+        
+        if data["feasible"] and data["trajectory"]:
+            # Extract all g_load values from trajectory
+            g_loads = [point["g_load"] for point in data["trajectory"]]
+            max_g_from_trajectory = max(g_loads)
+            
+            # Should match the summary peak_g_load
+            peak_g_from_summary = data["peak_g_load"]
+            
+            # Allow small floating-point tolerance
+            assert abs(max_g_from_trajectory - peak_g_from_summary) < 0.01, \
+                f"Max g-load from trajectory ({max_g_from_trajectory:.3f}) should match peak_g_load ({peak_g_from_summary:.3f})"
     
     def test_infeasible_trajectory_no_data(self, client):
         """Test infeasible trajectory returns null trajectory."""

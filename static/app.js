@@ -14,6 +14,7 @@ const state = {
     altitudeRangeChart: null,
     altitudeTimeChart: null,
     machTimeChart: null,
+    gLoadTimeChart: null,
     cesiumViewer: null,
     currentConfig: null
 };
@@ -566,6 +567,126 @@ function displayTrajectoryCharts(trajectory) {
                     title: {
                         display: true,
                         text: 'Mach Number'
+                    },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // G-Load vs Time Chart
+    const gLoadTimeData = trajectory.map(p => ({
+        x: p.time_s,
+        y: p.g_load
+    }));
+    
+    // Find peak g-load point
+    let peakGLoad = 0;
+    let peakGTime = 0;
+    let peakGPhase = '';
+    for (const point of trajectory) {
+        if (point.g_load > peakGLoad) {
+            peakGLoad = point.g_load;
+            peakGTime = point.time_s;
+            peakGPhase = point.phase || '';
+        }
+    }
+    
+    // Get max g-load limit from config
+    const maxGLoad = state.currentConfig?.limits?.max_g_load || 40;
+    
+    const gLoadTimeCtx = document.getElementById('gLoadTimeChart').getContext('2d');
+    
+    if (state.gLoadTimeChart) {
+        state.gLoadTimeChart.destroy();
+    }
+    
+    state.gLoadTimeChart = new Chart(gLoadTimeCtx, {
+        type: 'line',
+        data: {
+            datasets: [
+                {
+                    label: 'G-Load',
+                    data: gLoadTimeData,
+                    borderColor: '#ef4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    fill: true
+                },
+                {
+                    label: 'Max G-Load Limit',
+                    data: [
+                        { x: 0, y: maxGLoad },
+                        { x: trajectory[trajectory.length - 1].time_s, y: maxGLoad }
+                    ],
+                    borderColor: '#fbbf24',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0,
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            if (context.datasetIndex === 0) {
+                                return `G-Load: ${context.parsed.y.toFixed(2)} g, Time: ${context.parsed.x.toFixed(1)} s`;
+                            } else {
+                                return `Limit: ${context.parsed.y.toFixed(1)} g`;
+                            }
+                        }
+                    }
+                },
+                annotation: {
+                    annotations: {
+                        peakPoint: {
+                            type: 'point',
+                            xValue: peakGTime,
+                            yValue: peakGLoad,
+                            backgroundColor: '#dc2626',
+                            borderColor: '#ffffff',
+                            borderWidth: 2,
+                            radius: 6,
+                            label: {
+                                display: true,
+                                content: [`Peak ${peakGLoad.toFixed(1)} g`, `at t=${peakGTime.toFixed(1)} s`, peakGPhase],
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                color: '#ffffff',
+                                font: {
+                                    size: 11
+                                },
+                                padding: 6,
+                                position: 'top'
+                            }
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'Time (s)'
+                    },
+                    beginAtZero: true
+                },
+                y: {
+                    type: 'linear',
+                    title: {
+                        display: true,
+                        text: 'G-Load (g)'
                     },
                     beginAtZero: true
                 }
