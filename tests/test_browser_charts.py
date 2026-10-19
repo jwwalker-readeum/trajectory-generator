@@ -48,7 +48,7 @@ def test_all_charts_render_with_data(page, server):
     errors = []
     
     # Collect console messages and errors
-    page.on("console", lambda msg: console_messages.append(f"{msg.type()}: {msg.text()}"))
+    page.on("console", lambda msg: console_messages.append(f"{msg.type}: {msg.text}"))
     page.on("pageerror", lambda exc: errors.append(str(exc)))
     
     # Navigate to the application
