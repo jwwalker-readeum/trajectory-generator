@@ -16,8 +16,20 @@ from starlette.datastructures import Headers
 # Session secret for cookie signing
 SESSION_SECRET = secrets.token_urlsafe(32)
 
-# Paths that don't require authentication
-PUBLIC_PATHS = {'/api/health', '/login.html', '/api/login', '/favicon.ico'}
+# Stable public URL for the login page (must match the route in api.py).
+LOGIN_URL = '/login.html'
+
+# Paths that don't require authentication.
+# The main UI (/static/index.html, /static/app.js, /static/style.css) is NOT public.
+# Login page CSS is inline in login.html; only the page itself is listed here.
+PUBLIC_PATHS = {
+    '/api/health',
+    LOGIN_URL,
+    '/login',
+    '/api/login',
+    '/favicon.ico',
+    '/static/login.html',
+}
 
 
 def get_required_password() -> Optional[str]:
@@ -66,9 +78,9 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
         if password is None:
             return await call_next(request)
         
-        # Check if path is public
+        # Check if path is public (do not treat all of /static/ as public)
         path = request.url.path
-        if path in PUBLIC_PATHS or path.startswith('/static/'):
+        if path in PUBLIC_PATHS:
             return await call_next(request)
         
         # Check for valid session cookie
@@ -111,4 +123,4 @@ class PasswordAuthMiddleware(BaseHTTPMiddleware):
         else:
             # Redirect HTML requests to login page
             from fastapi.responses import RedirectResponse
-            return RedirectResponse(url='/login.html', status_code=302)
+            return RedirectResponse(url=LOGIN_URL, status_code=302)

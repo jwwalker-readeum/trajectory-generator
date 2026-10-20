@@ -4,7 +4,7 @@ NOTIONAL DEMO SERVICE - All simulation results are for demonstration only.
 """
 
 from fastapi import FastAPI, HTTPException, status, Form
-from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse
+from fastapi.responses import JSONResponse, RedirectResponse, HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, List
@@ -115,6 +115,19 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 async def root():
     """Redirect to main UI."""
     return RedirectResponse(url="/static/index.html")
+
+
+@app.get("/login.html")
+@app.get("/login")
+async def login_page():
+    """Serve the login page at a stable public URL.
+
+    The file lives in static/ but is not reachable at /login.html via the
+    StaticFiles mount. Auth middleware redirects unauthenticated HTML
+    requests here, so this route must exist and stay in PUBLIC_PATHS.
+    """
+    login_file = static_dir / "login.html"
+    return FileResponse(login_file, media_type="text/html")
 
 
 @app.post("/api/login")
