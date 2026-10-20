@@ -21,6 +21,23 @@ const state = {
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', () => {
+    // Register Chart.js annotation plugin if available
+    if (typeof Chart !== 'undefined') {
+        // Try to register the annotation plugin
+        // The plugin might be auto-registered or need explicit registration
+        if (typeof ChartAnnotation !== 'undefined') {
+            Chart.register(ChartAnnotation);
+            console.log('Chart.js annotation plugin registered via ChartAnnotation');
+        } else if (Chart.Annotation) {
+            Chart.register(Chart.Annotation);
+            console.log('Chart.js annotation plugin registered via Chart.Annotation');
+        } else if (Chart.registry && Chart.registry.plugins.get('annotation')) {
+            console.log('Chart.js annotation plugin already registered');
+        } else {
+            console.warn('Chart.js annotation plugin not found - annotations may not work');
+        }
+    }
+    
     initializeMap();
     initializeEventListeners();
     loadConfigForEditor();
@@ -601,98 +618,142 @@ function displayTrajectoryCharts(trajectory) {
         state.gLoadTimeChart.destroy();
     }
     
-    state.gLoadTimeChart = new Chart(gLoadTimeCtx, {
-        type: 'line',
-        data: {
-            datasets: [
-                {
-                    label: 'G-Load',
-                    data: gLoadTimeData,
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    fill: true
-                },
-                {
-                    label: 'Max G-Load Limit',
-                    data: [
-                        { x: 0, y: maxGLoad },
-                        { x: trajectory[trajectory.length - 1].time_s, y: maxGLoad }
-                    ],
-                    borderColor: '#fbbf24',
-                    borderWidth: 2,
-                    borderDash: [5, 5],
-                    pointRadius: 0,
-                    fill: false
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            aspectRatio: 2,
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top'
-                },
-                tooltip: {
-                    callbacks: {
-                        label: (context) => {
-                            if (context.datasetIndex === 0) {
-                                return `G-Load: ${context.parsed.y.toFixed(2)} g, Time: ${context.parsed.x.toFixed(1)} s`;
-                            } else {
-                                return `Limit: ${context.parsed.y.toFixed(1)} g`;
-                            }
-                        }
-                    }
-                },
-                annotation: {
-                    annotations: {
-                        peakPoint: {
-                            type: 'point',
-                            xValue: peakGTime,
-                            yValue: peakGLoad,
-                            backgroundColor: '#dc2626',
-                            borderColor: '#ffffff',
-                            borderWidth: 2,
-                            radius: 6,
-                            label: {
-                                display: true,
-                                content: [`Peak ${peakGLoad.toFixed(1)} g`, `at t=${peakGTime.toFixed(1)} s`, peakGPhase],
-                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                                color: '#ffffff',
-                                font: {
-                                    size: 11
-                                },
-                                padding: 6,
-                                position: 'top'
-                            }
-                        }
-                    }
-                }
+    // Build chart options - annotation config separate for resilience
+    const gLoadChartOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
+        plugins: {
+            legend: {
+                display: true,
+                position: 'top'
             },
-            scales: {
-                x: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'Time (s)'
-                    },
-                    beginAtZero: true
-                },
-                y: {
-                    type: 'linear',
-                    title: {
-                        display: true,
-                        text: 'G-Load (g)'
-                    },
-                    beginAtZero: true
+            tooltip: {
+                callbacks: {
+                    label: (context) => {
+                        if (context.datasetIndex === 0) {
+                            return `G-Load: ${context.parsed.y.toFixed(2)} g, Time: ${context.parsed.x.toFixed(1)} s`;
+                        } else {
+                            return `Limit: ${context.parsed.y.toFixed(1)} g`;
+                        }
+                    }
                 }
             }
+        },
+        scales: {
+            x: {
+                type: 'linear',
+                title: {
+                    display: true,
+                    text: 'Time (s)'
+                },
+                beginAtZero: true
+            },
+            y: {
+                type: 'linear',
+                title: {
+                    display: true,
+                    text: 'G-Load (g)'
+                },
+                beginAtZero: true
+            }
         }
-    });
+    };
+    
+    // Add annotation config if plugin is available
+    if (typeof Chart !== 'undefined' && Chart.registry && Chart.registry.plugins.get('annotation')) {
+        gLoadChartOptions.plugins.annotation = {
+            annotations: {
+                peakPoint: {
+                    type: 'point',
+                    xValue: peakGTime,
+                    yValue: peakGLoad,
+                    backgroundColor: '#dc2626',
+                    borderColor: '#ffffff',
+                    borderWidth: 2,
+                    radius: 6,
+                    label: {
+                        display: true,
+                        content: [`Peak ${peakGLoad.toFixed(1)} g`, `at t=${peakGTime.toFixed(1)} s`, peakGPhase],
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        color: '#ffffff',
+                        font: {
+                            size: 11
+                        },
+                        padding: 6,
+                        position: 'top'
+                    }
+                }
+            }
+        };
+    } else {
+        console.warn('Chart.js annotation plugin not available - peak marker will not be shown');
+    }
+    
+    try {
+        state.gLoadTimeChart = new Chart(gLoadTimeCtx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'G-Load',
+                        data: gLoadTimeData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true
+                    },
+                    {
+                        label: 'Max G-Load Limit',
+                        data: [
+                            { x: 0, y: maxGLoad },
+                            { x: trajectory[trajectory.length - 1].time_s, y: maxGLoad }
+                        ],
+                        borderColor: '#fbbf24',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: gLoadChartOptions
+        });
+    } catch (error) {
+        console.error('Failed to create G-Load chart:', error);
+        // Try again without annotation config
+        delete gLoadChartOptions.plugins.annotation;
+        state.gLoadTimeChart = new Chart(gLoadTimeCtx, {
+            type: 'line',
+            data: {
+                datasets: [
+                    {
+                        label: 'G-Load',
+                        data: gLoadTimeData,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true
+                    },
+                    {
+                        label: 'Max G-Load Limit',
+                        data: [
+                            { x: 0, y: maxGLoad },
+                            { x: trajectory[trajectory.length - 1].time_s, y: maxGLoad }
+                        ],
+                        borderColor: '#fbbf24',
+                        borderWidth: 2,
+                        borderDash: [5, 5],
+                        pointRadius: 0,
+                        fill: false
+                    }
+                ]
+            },
+            options: gLoadChartOptions
+        });
+    }
 }
 
 // Show 3D Visualization
